@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "ca_comonad"
+name = "comonad"
 version = "0.1.0"

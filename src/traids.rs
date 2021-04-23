@@ -5,7 +5,7 @@
 /// ```
 /// #![allow(incomplete_features)]
 /// #![feature(generic_associated_types)]
-/// use ca_comonad::traids::Functor;
+/// use comonad::traids::Functor;
 ///
 /// #[derive(Debug, PartialEq, Eq)]
 /// pub enum Maybe<T> {
@@ -38,3 +38,10 @@ pub trait Functor<A> {
     fn fmap<B>(self, f: impl Fn(A) -> B) -> Self::F<B>;
 }
 
+/// Based in [Haskell Commonads](https://hackage.haskell.org/package/comonad)
+pub trait Comonad<A> {
+    type W<T>;
+
+    fn extract(self) -> A;
+    fn extend<B>(self, f: impl Fn(Self::W<A>) -> B) -> Self::W<B>;
+}
