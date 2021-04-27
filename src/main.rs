@@ -1,109 +1,103 @@
-#![allow(incomplete_features)]
-#![feature(generic_associated_types)]
+#![feature(in_band_lifetimes)]
 
-use comonad::traids::{Comonad, Functor};
+use std::rc::Rc;
+use std::slice::Iter;
 
 #[derive(Debug, Clone)]
 struct Strip<T> {
-    data: Vec<T>,
-    index: usize,
+    data: Rc<Vec<T>>,
+    index: isize,
 }
 
-impl<T> Strip<T>
-where
-    T: Clone,
-{
-    pub fn shift_left(&self) -> Strip<T> {
+impl<T> Strip<T> {
+    #[inline(always)]
+    fn len(&self) -> isize {
+        self.data.len() as isize
+    }
+
+    #[inline(always)]
+    fn iter(&self) -> Iter<T> {
+        self.data.iter()
+    }
+
+    #[inline(always)]
+    fn new(data: Vec<T>, index: isize) -> Strip<T> {
         Strip {
-            data: self.data.clone(),
-            index: if self.index == 0 {
-                self.data.len() - 1
-            } else {
-                self.index - 1
-            },
+            data: Rc::new(data),
+            index,
         }
     }
 
-    pub fn shift_right(&self) -> Strip<T> {
+    #[inline(always)]
+    fn get(&self, offset: isize) -> Strip<T> {
+        let len = self.len();
+        let future_index = self.index + offset;
+
+        // TODO: discutir checagem de borda
+        if future_index < 0 {
+            return self.get(offset + len);
+        }
+        if future_index >= self.len() {
+            return self.get(offset - len);
+        }
+
+        // TODO: implemente get_extract() evitando criar essa strip extra aqui
         Strip {
             data: self.data.clone(),
-            index: if self.index == self.data.len() - 1 {
-                0
-            } else {
-                self.index + 1
-            },
+            index: self.index + offset,
         }
     }
-}
 
-impl Strip<bool> {
-    fn pretty(&self) -> String {
-        self.data
-            .iter()
-            .map(|i| if *i { "██" } else { "  " })
+    fn get_all(&self) -> Vec<Strip<T>> {
+        (0..(self.len()))
+            .map(|index| Strip {
+                data: self.data.clone(),
+                index,
+            })
             .collect()
     }
 }
 
-impl Strip<bool> {}
-
-impl<A> Functor<A> for Strip<A>
+// Comonad
+impl<A> Strip<A>
 where
-    A: Clone,
+    A: Copy + std::fmt::Debug,
 {
-    type F<T> = Strip<T>;
-
-    fn fmap<B>(self, f: impl Fn(A) -> B) -> Self::F<B> {
-        Strip {
-            data: self.data.iter().map(|i| f(i.clone())).collect::<Vec<B>>(),
-            index: self.index,
-        }
-    }
-}
-
-impl<A> Comonad<A> for Strip<A>
-where
-    A: Clone + Copy,
-{
-    type W<T> = Strip<T>;
-
+    #[inline(always)]
     fn extract(self) -> A {
-        self.data[self.index]
+        self.data[self.index as usize]
     }
 
-    fn extend<B>(self, f: impl Fn(Self::W<A>) -> B) -> Self::W<B> {
+    // TODO: Como fazer isso no mesmo array se eu não sei o quanto que tenho que guardar pra
+    // sobrescrever?
+    fn extend<B>(self, f: impl Fn(&Strip<A>) -> B) -> Strip<B> {
+        let data: Vec<B> = self.get_all().iter().map(|s| f(s)).collect();
         Strip {
             index: self.index,
-            data: std::iter::repeat(self.clone())
-                .take(self.data.len())
-                .enumerate()
-                .map(|(i, mut s)| {
-                    s.index = i;
-                    s
-                })
-                .map(|s| f(s))
-                .collect(),
+            data: Rc::new(data),
         }
     }
 }
 fn main() {
-    let rule = |s: Strip<bool>| -> bool {
-        let l = s.clone().shift_left().extract();
-        let m = s.clone().extract();
-        let r = s.clone().shift_right().extract();
+    let rule = |s: &Strip<bool>| -> bool {
+        let l = s.get(-1).extract();
+        let m = s.get(0).extract();
+        let r = s.get(1).extract();
 
         match (l, m, r) {
             (true, false, false) | (false, false, true) => true,
             (_, _, _) => false,
         }
     };
-    let mut layer = Strip {
-        index: 0,
-        data: vec![false; 51],
-    };
-    layer.data[25] = true;
+
+    let mut data = vec![false; 50];
+    data[25] = true;
+
+    let mut layer = Strip::new(data, 0);
+
     for _ in 0..30 {
-        println!("{}", layer.pretty());
+        let pretty: String = layer.iter().map(|i| if *i { "██" } else { "  " }).collect();
+        println!("{}", pretty);
         layer = layer.extend(rule);
     }
 }
