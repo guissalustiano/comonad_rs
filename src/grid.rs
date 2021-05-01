@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct Grid<T> {
-    data: Rc<DMatrix<T>>,
-    index: (isize, isize),
+    pub data: Rc<DMatrix<T>>,
+    pub index: (isize, isize),
 }
 
 impl<T> Grid<T>
@@ -28,8 +28,8 @@ where
         // TODO: discutir checagem de borda
         if future_index.0 < 0
             || future_index.1 < 0
-            || future_index.0 >= ncols
-            || future_index.1 >= nrows
+            || future_index.0 >= nrows
+            || future_index.1 >= ncols
         {
             return self.clone();
         }
@@ -46,7 +46,8 @@ where
         let nrows = (*self.data).nrows() as isize;
         let ncols = (*self.data).ncols() as isize;
 
-        (0..ncols).flat_map(|y| (0..nrows).map(move |x| (x, y)))
+        (0..ncols)
+            .flat_map(|y| (0..nrows).map(move |x| (x, y)))
             .map(|index| Grid {
                 data: self.data.clone(),
                 index,

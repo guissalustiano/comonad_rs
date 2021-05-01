@@ -7,7 +7,7 @@ pub struct Strip<T> {
     index: isize,
 }
 
- impl<T> Strip<T> {
+impl<T> Strip<T> {
     #[inline(always)]
     fn len(&self) -> isize {
         self.data.len() as isize
